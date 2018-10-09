@@ -12,6 +12,16 @@ The data is now available at ftp://data.cresis.ku.edu/data/rds/2014_Greenland_P3
 
 The code is developed with CUDA 8.0, ***Python 2.7***, ***PyTorch >= 0.4***
 
+### Demo
+If you use default path for data and pretrained models, just run:
+```
+python demo.py
+```
+others, please run:
+```
+python demo.py --data_root {path/to/data/root} --test_session_set {list/of/test/sessions} --c3d_pth {path/to/the/c3d.pth} --rnn_pth {path/to/the/c3d.pth}
+```
+
 ### Citations
 
 If you are using the data/code/model provided here in a publication, please cite our papers:
