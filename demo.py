@@ -17,6 +17,8 @@ import config as cfg
 from models import C3D
 from models import RNN
 
+
+
 def default_loader(path, number):
     c3d_data = []
     for index in range(number-2, number+3):
@@ -59,12 +61,14 @@ class DataLayer(data.Dataset):
         return len(self.inputs)
 
 def main():
+
     parser = argparse.ArgumentParser()
     parser.add_argument('--gpu', default='0', type=str)
     parser.add_argument('--batch_size', default=1, type=int)
     parser.add_argument('--num_workers', default=0, type=int)
     parser.add_argument('--c3d_pth', default='pretrained_models/c3d.pth', type=str)
     parser.add_argument('--rnn_pth', default='pretrained_models/rnn.pth', type=str)
+    parser.add_argument('--output_dir', default='/data/polar', type=str) #arg for output dir. 
     args = cfg.parse_args(parser)
 
     os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu
@@ -108,9 +112,23 @@ def main():
             init = torch.cat((air_feature, bed_feature), 1)
             air_output, bed_output = rnn_model(rnn_data, init)
 
+
+            #takes arg, default is /data/polar
+            result_dir=args.output_dir+'/'+str(start)+'/'+str(data_path[0])+'/'
+            if not os.path.exists(result_dir):
+                os.makedirs(result_dir)
+            
+
+
             # Save these air and bed layer for visualization
+            #
+            timestamp = str(time.time())
             air_layer = (air_output.to('cpu').numpy()+1)*412
+            #default result_dir is /data/polar/(start unix time)/flight/num.
+            np.savetxt(result_dir+str(batch_idx).zfill(5)+ '_air_layer_'  +'.txt', air_layer)
+
             bed_layer = (bed_output.to('cpu').numpy()+1)*412
+            np.savetxt(result_dir+str(batch_idx).zfill(5)+ '_bed_layer_' +'.txt', bed_layer)
 
             air_loss = air_criterion(air_output, air_target)
             bed_loss = bed_criterion(bed_output, bed_target)
