@@ -13,10 +13,10 @@ import numpy.linalg as LA
 from scipy.io import loadmat
 
 sys.path.insert(0, '../../')
-import config as cfg
+import comfig as cfg
 from models import C3D
 from models import RNN
-
+from collections import OrderedDict
 
 
 def default_loader(path, number):
@@ -34,14 +34,15 @@ def default_loader(path, number):
     return c3d_data, rnn_data
 
 class DataLayer(data.Dataset):
-    def __init__(self, data_root, sessions, loader=default_loader):
+    def __init__(self, data_root, sessions, input, loader=default_loader):
         self.data_root = data_root
         self.sessions = sessions
         self.loader = loader
+        self.input = input
 
         self.inputs = []
         for session_name in self.sessions:
-            session_path = osp.join(self.data_root, 'target', session_name+'.txt')
+            session_path = osp.join(self.data_root, 'target', self.input)
             session_data = open(session_path, 'r').read().splitlines()
             self.inputs.extend(session_data)
 
@@ -68,23 +69,26 @@ def main():
     parser.add_argument('--num_workers', default=0, type=int)
     parser.add_argument('--c3d_pth', default='pretrained_models/c3d.pth', type=str)
     parser.add_argument('--rnn_pth', default='pretrained_models/rnn.pth', type=str)
-    parser.add_argument('--output_dir', default='/data/polar', type=str) #arg for output dir. 
+    parser.add_argument('--input', default='Data_20140506_01_024.txt', type=str) #target file - one file will do all in flight run
+    parser.add_argument('--output_dir', default='/data/polar', type=str)
     args = cfg.parse_args(parser)
+
 
     os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     data_set = DataLayer(
         data_root=args.data_root,
-        sessions=args.test_session_set,
+        sessions=args.input,
+        input=args.input,
     )
+
 
     data_loader = data.DataLoader(
         data_set,
         batch_size=args.batch_size,
         num_workers=args.num_workers,
     )
-
     c3d_model = C3D().to(device)
     c3d_model.load_state_dict(torch.load(args.c3d_pth))
     c3d_model.train(False)
@@ -113,7 +117,7 @@ def main():
             air_output, bed_output = rnn_model(rnn_data, init)
 
 
-            #takes arg, default is /data/polar
+            #results go to output_dir/<start>/<target/ flight>/
             result_dir=args.output_dir+'/'+str(start)+'/'+str(data_path[0])+'/'
             if not os.path.exists(result_dir):
                 os.makedirs(result_dir)
@@ -121,14 +125,14 @@ def main():
 
 
             # Save these air and bed layer for visualization
-            #
             timestamp = str(time.time())
             air_layer = (air_output.to('cpu').numpy()+1)*412
-            #default result_dir is /data/polar/(start unix time)/flight/num.
-            np.savetxt(result_dir+str(batch_idx).zfill(5)+ '_air_layer_'  +'.txt', air_layer)
+            # save to device, looks like /data/polar/timestamp/2014..../001/batchid_air_layer.txt
+            np.savetxt(result_dir+str(batch_idx).zfill(5)+ '_air_layer'  +'.txt', air_layer)
 
             bed_layer = (bed_output.to('cpu').numpy()+1)*412
-            np.savetxt(result_dir+str(batch_idx).zfill(5)+ '_bed_layer_' +'.txt', bed_layer)
+            #save to device - e.g. /data/polar/timestamp/2014..../001/batchid_bed_layer.txt
+            np.savetxt(result_dir+str(batch_idx).zfill(5)+ '_bed_layer' +'.txt', bed_layer)
 
             air_loss = air_criterion(air_output, air_target)
             bed_loss = bed_criterion(bed_output, bed_target)
